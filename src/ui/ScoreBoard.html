@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>解説: ScoreBoard.ts</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+
+<nav class="breadcrumb"><a href="../index.html">← 解説一覧へ戻る</a></nav>
+
+<h1>ScoreBoard.ts の解説</h1>
+
+<section>
+<h2>このファイルの役割</h2>
+<p>
+画面左上に表示されるスコアを管理するクラスです。
+「現在のスコアの数値」と「画面に表示するテキスト」の両方を内部に持ち、
+スコアが変わるたびに表示も一緒に更新します。
+</p>
+</section>
+
+<section>
+<h2>前提となる用語</h2>
+<dl>
+  <dt>Text オブジェクト</dt>
+  <dd>
+    画面上に文字列を表示するためのPhaserのGameObjectです。
+    Spriteが画像を表示するのに対し、Textは文字を表示します。
+    一度作成した後は <code>setText(...)</code> で表示内容を書き換えられます。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>各メソッドの説明と処理の流れ</h2>
+
+<dl>
+  <dt>① constructor(scene) — 生成時に1回だけ</dt>
+  <dd>
+    <code>ScrollScene.create()</code> から <code>new ScoreBoard(this)</code> として呼ばれます。
+    <code>scene.add.text(...)</code> で「score: 0」という文字を画面に表示し、
+    そのTextオブジェクトを <code>this.text</code> に保持します。
+    内部のスコア値 <code>this.score</code> は <code>0</code> で初期化されています。
+  </dd>
+
+  <dt>② add(points) — スターを獲得するたびに呼ばれる</dt>
+  <dd>
+    <code>ScrollScene</code> の <code>handleCollectStar</code> から、
+    <code>this._scoreBoard.add(SCORE.star)</code> として呼ばれます。
+    <ol>
+      <li><code>this.score</code> に <code>points</code> を加算する</li>
+      <li><code>this.text.setText(...)</code> で表示文字列を最新のスコアに更新する</li>
+    </ol>
+    「数値の更新」と「表示の更新」を1つのメソッドにまとめることで、
+    呼び出し側が表示の更新を忘れる心配がなくなります。
+  </dd>
+
+  <dt>③ reset() — スコアを初期状態に戻す</dt>
+  <dd>
+    <code>this.score</code> を <code>0</code> に戻し、表示も「score: 0」に戻します。
+    <div class="note">
+    現在の <code>ScrollScene</code> からはまだ呼び出されていません。
+    リスタート機能などを追加する際に使うことを想定して用意されているメソッドです。
+    </div>
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2 class="ts">TypeScriptの言語仕様</h2>
+
+<dl>
+  <dt>private フィールドの初期値</dt>
+  <dd>
+    <pre><code>private score = 0;</code></pre>
+    クラスのプロパティは、宣言と同時に初期値を与えることができます。
+    <code>Player.ts</code> の <code>private readonly scene</code> は
+    「コンストラクタ引数から受け取る」形でしたが、
+    <code>score</code> はコンストラクタの引数とは関係なく、常に <code>0</code> から始まる値なので、
+    このようにフィールド宣言の時点で初期化しています。
+  </dd>
+
+  <dt>テンプレートリテラル</dt>
+  <dd>
+    <pre><code>this.text.setText(`Score: ${this.score}`);</code></pre>
+    バッククォート(<code>`</code>)で囲んだ文字列の中に <code>${式}</code> を書くと、
+    その式の結果を文字列に埋め込めます。
+    <code>this.score</code> が <code>30</code> なら、<code>"Score: 30"</code> という文字列になります。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2 class="phaser">Phaser 4の仕様</h2>
+
+<dl>
+  <dt>scene.add.text</dt>
+  <dd>
+    <pre><code>this.text = scene.add.text(TEXT.scoreX, TEXT.scoreY, "score: 0", {
+  fontSize: TEXT.scoreFontSize,
+  color: TEXT.scoreColor,
+});</code></pre>
+    指定した座標に、指定した文字列・スタイルでTextオブジェクトを作成し、画面に追加します。
+    第4引数のスタイルオブジェクトでは、文字色の指定に <code>color</code> プロパティを使います
+    (<code>constants/game.ts</code> の解説でも触れていますが、Phaser 4では <code>fill</code> ではなく
+    <code>color</code> である点に注意してください)。
+  </dd>
+
+  <dt>setText</dt>
+  <dd>
+    <pre><code>this.text.setText(`Score: ${this.score}`);</code></pre>
+    既に作成済みのTextオブジェクトの表示内容を書き換えます。
+    新しいTextを作り直す必要はなく、同じオブジェクトの文字列だけが更新されます。
+  </dd>
+</dl>
+</section>
+
+</body>
+</html>

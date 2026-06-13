@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>解説: game.ts</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+
+<nav class="breadcrumb"><a href="../index.html">← 解説一覧へ戻る</a></nav>
+
+<h1>constants/game.ts の解説</h1>
+
+<section>
+<h2>このファイルの役割</h2>
+<p>
+ゲーム全体で使う「数値」や「文字列」をまとめて定義したファイルです。
+クラスや関数は持たず、<code>export const ...</code> による定数の定義だけが並んでいます。
+他のファイルはここから必要な値をimportして使います。
+</p>
+</section>
+
+<section>
+<h2>前提となる用語</h2>
+<dl>
+  <dt>マジックナンバー</dt>
+  <dd>
+    コードの中に直接書かれた、意味の分かりにくい数値や文字列のことです。
+    例えば <code>sprite.setVelocityX(160)</code> という記述だけでは、<code>160</code> が何を表す数値か分かりません。
+    <code>PLAYER.speed</code> のような名前付きの定数にすることで、意味が伝わりやすくなり、
+    変更したい場合もこのファイルの1か所を直すだけで済みます。
+  </dd>
+
+  <dt>定数(const)</dt>
+  <dd>
+    一度代入したら再代入できない変数です。設定値のように「途中で変わらないはずの値」には
+    <code>const</code> を使うのが基本です。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>各定数グループの説明</h2>
+
+<dl>
+  <dt>GAME_SIZE</dt>
+  <dd>ゲーム画面の幅と高さ。<code>main.ts</code> のPhaser設定や、<code>Bombs.ts</code> でボムの出現位置を決める際に使われます。</dd>
+
+  <dt>PHYSICS</dt>
+  <dd>Arcade Physicsの初期設定。<code>gravity.y</code> が大きいほど、キャラクターやアイテムが強く下に引かれます。<code>main.ts</code> でのみ使用します。</dd>
+
+  <dt>ASSET_BASE_URL / ASSET_KEYS / ASSET_PATHS</dt>
+  <dd>
+    画像・スプライトシートを読み込むための設定です。
+    <code>ASSET_BASE_URL</code> + <code>ASSET_PATHS</code> の組み合わせが実際の画像URLになり、
+    <code>ASSET_KEYS</code> はPhaser内でその画像を呼び出すための名前(キー)になります。
+    <code>ScrollScene.preload()</code> で使われます。
+  </dd>
+
+  <dt>ANIMATION_KEYS</dt>
+  <dd>プレイヤーのアニメーション名。<code>Player.ts</code> で <code>anims.create</code> / <code>anims.play</code> のキーとして使われます。</dd>
+
+  <dt>PLAYER</dt>
+  <dd>プレイヤーの初期位置・跳ね返り・移動速度・ジャンプ力。<code>Player.ts</code> で使われます。</dd>
+
+  <dt>PLATFORM_LAYOUT</dt>
+  <dd>足場(地面)を配置する座標とサイズのリスト。<code>Platforms.ts</code> でこのリストをループして足場を生成します。詳細は <a href="../stage/Platforms.html">Platforms.html</a> を参照してください。</dd>
+
+  <dt>STAR_FIELD</dt>
+  <dd>収集アイテム「スター」の並べ方と跳ね方。<code>Stars.ts</code> で使われます。詳細は <a href="../objects/Stars.html">Stars.html</a> を参照してください。</dd>
+
+  <dt>BOMB</dt>
+  <dd>ボムの出現位置・跳ね返り・速度の範囲。<code>Bombs.ts</code> で使われます。</dd>
+
+  <dt>SCORE</dt>
+  <dd>スコア計算用の値。現在は「スター1個 = 10点」のみ。<code>ScrollScene.ts</code> の <code>handleCollectStar</code> で使われます。</dd>
+
+  <dt>TEXT</dt>
+  <dd>画面に表示するテキスト(スコア・GAME OVER)の位置とスタイル。<code>ScoreBoard.ts</code> と <code>ScrollScene.ts</code> で使われます。</dd>
+</dl>
+</section>
+
+<section>
+<h2 class="ts">TypeScriptの言語仕様</h2>
+
+<dl>
+  <dt>as const</dt>
+  <dd>
+    <pre><code>export const PLAYER = {
+  startX: 100,
+  startY: 450,
+  bounce: 0.2,
+  speed: 160,
+  jumpVelocity: -300,
+} as const;</code></pre>
+    オブジェクトや配列の末尾に <code>as const</code> を付けると、
+    TypeScriptはその値を「変更されない値」として扱い、より厳密な型を推論します。
+    例えば <code>as const</code> がない場合、<code>PLAYER.speed</code> の型は単なる <code>number</code> ですが、
+    <code>as const</code> を付けると <code>160</code> という値そのものの型(リテラル型)になります。
+    これにより、定数を間違った値で上書きしようとするとエラーになります。
+  </dd>
+
+  <dt>配列 + as const(読み取り専用のタプル)</dt>
+  <dd>
+    <pre><code>export const PLATFORM_LAYOUT = [
+  { x: 400, y: 568, scale: 2 },
+  { x: 600, y: 400 },
+  { x: 50, y: 250 },
+  { x: 750, y: 220 },
+] as const;</code></pre>
+    配列に <code>as const</code> を付けると、要素数や各要素の型(どの要素に <code>scale</code> があるか等)が
+    そのまま固定された型になります。<code>Platforms.ts</code> 側では
+    <code>"scale" in platform</code> という判定で、<code>scale</code> プロパティの有無を型レベルで安全に確認できます。
+  </dd>
+
+  <dt>オブジェクトの値を他ファイルで利用する(export / import)</dt>
+  <dd>
+    <pre><code>export const ASSET_KEYS = { ... } as const;</code></pre>
+    <code>export</code> をつけた定数は、他のファイルで
+    <code>import { ASSET_KEYS } from "../constants/game.js";</code> のように読み込んで使えます。
+    1か所で定義した値を複数ファイルで共有する、最も基本的な方法です。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2 class="phaser">Phaser 4の仕様</h2>
+
+<dl>
+  <dt>gravity の指定形式</dt>
+  <dd>
+    <pre><code>export const PHYSICS = {
+  gravity: { x: 0, y: 300 },
+  debug: false,
+} as const;</code></pre>
+    Arcade Physicsの重力は <code>{ x, y }</code> の形で指定します。
+    <code>y</code> がプラスの値だと、下方向に重力がかかります(Phaserの画面座標は下方向がプラス)。
+  </dd>
+
+  <dt>spritesheet のフレームサイズ</dt>
+  <dd>
+    <code>ASSET_KEYS.dude</code> の画像は、<code>ScrollScene.preload()</code> で
+    <code>{ frameWidth: 32, frameHeight: 48 }</code> を指定して読み込まれます。
+    1枚の画像を32×48ピクセルごとに区切り、複数のフレーム(コマ)として扱うための設定です。
+    <code>ANIMATION_KEYS</code> のアニメーションは、このフレームを組み合わせて作られます。
+  </dd>
+
+  <dt>TextStyle の color</dt>
+  <dd>
+    <pre><code>export const TEXT = {
+  ...
+  scoreColor: "#FFFFFF",
+  ...
+  gameOverColor: "#ff0000",
+} as const;</code></pre>
+    Phaser 4のテキストスタイルでは、文字色の指定に <code>color</code> プロパティを使います
+    (古いバージョンや一部のスタイルでは <code>fill</code> という名前が使われていたこともあるため、
+    Phaser 4のドキュメントを参照する際は <code>color</code> であることに注意してください)。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>設計のポイント: 設定値を1ファイルに集約する理由</h2>
+<p>
+もしこれらの値を各クラスのコードに直接書いてしまうと、
+「プレイヤーの速度を変えたい」と思ったときに、複数のファイルを探し回る必要が出てきます。
+</p>
+<p>
+このプロジェクトでは、見た目や動きに関わる数値・文字列を<code>constants/game.ts</code>に集約することで、
+</p>
+<ul>
+  <li>調整したい値が1か所にまとまっていて見つけやすい</li>
+  <li>同じ値を複数ファイルで使う場合も、矛盾が起きない</li>
+  <li>各クラスのコードは「何のための値か」が名前から分かる状態になる</li>
+</ul>
+<p>
+というメリットが得られます。新しい定数を追加する際も、関連するグループ
+(<code>PLAYER</code>、<code>BOMB</code> など)にまとめて追加していくと、見通しが良くなります。
+</p>
+</section>
+
+</body>
+</html>

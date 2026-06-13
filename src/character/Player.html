@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>解説: Player.ts</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+
+<nav class="breadcrumb"><a href="../index.html">← 解説一覧へ戻る</a></nav>
+
+<h1>Player.ts の解説</h1>
+
+<section>
+<h2>このファイルの役割</h2>
+<p>
+プレイヤーキャラクターの「見た目」と「動き」をまとめて管理するクラスです。
+<code>ScrollScene</code> はこのクラスの <code>update()</code> を呼ぶだけで、
+キー入力の判定やアニメーション切り替えの詳細を意識しなくて済むようになっています。
+</p>
+</section>
+
+<section>
+<h2>前提となる用語</h2>
+<dl>
+  <dt>Sprite(スプライト)</dt>
+  <dd>
+    画像を表示できるPhaserのオブジェクトです。位置(x, y)・拡大縮小・回転・アニメーションなど、
+    画面に映る「絵」を動かすための基本パーツだと考えてください。
+    <code>this.sprite</code> はプレイヤーの見た目そのものを表しています。
+  </dd>
+
+  <dt>Arcade Physics(アーケード物理)</dt>
+  <dd>
+    Phaserに組み込まれている、シンプルな物理エンジンです。
+    重力・速度・衝突判定など「動き」に関する計算を代わりに行ってくれます。
+    後述の <code>physics.add.sprite</code> で作ったSpriteだけがこの機能を使えます。
+  </dd>
+
+  <dt>body(物理ボディ)</dt>
+  <dd>
+    Spriteに付属する、当たり判定や速度などの物理情報を持つオブジェクトです。
+    <code>this.sprite.body</code> でアクセスし、<code>setVelocityX</code> や
+    <code>body.touching.down</code> のような物理に関する操作・参照はすべてこのbody経由で行われます。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>各メソッドの説明と処理の流れ</h2>
+
+<p>このクラスには4つのメソッドがあります。呼ばれるタイミングと役割は次のとおりです。</p>
+
+<dl>
+  <dt>① constructor(scene, x, y) — 生成時に1回だけ</dt>
+  <dd>
+    <code>ScrollScene.create()</code> から <code>new Player(this, PLAYER.startX, PLAYER.startY)</code> として呼ばれます。
+    <ol>
+      <li><code>createAnimations()</code> を呼び、左向き/正面/右向きのアニメーションをScene側に登録する</li>
+      <li><code>scene.physics.add.sprite(...)</code> でプレイヤーの見た目(Sprite)を物理ボディ付きで作成し、<code>this.sprite</code> に保持する</li>
+      <li><code>setBounce</code> と <code>setCollideWorldBounds</code> で、跳ね返り方と画面外に出ない設定を行う</li>
+    </ol>
+    この時点ではまだ「動き」は始まりません。見た目と設定の準備だけが行われます。
+  </dd>
+
+  <dt>② update(cursorKeys) — 毎フレーム呼ばれる</dt>
+  <dd>
+    <code>ScrollScene.update()</code>(Phaserのライフサイクルで毎フレーム自動実行)から、
+    <code>this._player.update(this._cursorKeys)</code> として毎フレーム呼ばれます。
+    <ol>
+      <li>左キーが押されていれば、左方向に速度を設定し、左向きアニメーションを再生</li>
+      <li>右キーが押されていれば、右方向に速度を設定し、右向きアニメーションを再生</li>
+      <li>どちらも押されていなければ、横方向の速度を0にし、正面向きアニメーションを再生</li>
+      <li>上キーが押されており、かつ地面に接地している場合のみ、上方向に速度を設定してジャンプさせる</li>
+    </ol>
+    左右の判定とジャンプの判定は独立しているため、「歩きながらジャンプ」も発生します。
+  </dd>
+
+  <dt>③ tintDamage() — 爆弾に当たったときに1回</dt>
+  <dd>
+    <code>ScrollScene</code> の <code>handleHitBomb</code>(プレイヤーと爆弾の衝突コールバック)から呼ばれます。
+    プレイヤーの色を赤くし(<code>setTint</code>)、正面向きアニメーションに固定します。
+    ゲームオーバー時の見た目変更だけを担当し、ゲームオーバーの判定やテキスト表示自体は
+    <code>ScrollScene</code> 側の責務です。
+  </dd>
+
+  <dt>④ createAnimations() — constructorから1回だけ呼ばれるprivateメソッド</dt>
+  <dd>
+    外部からは呼べない内部処理です。1枚のスプライトシート画像から、
+    「左向き歩行」「停止(正面)」「右向き歩行」の3種類のアニメーションを切り出して
+    Sceneに登録します。<code>update()</code> や <code>tintDamage()</code> は、
+    ここで登録した <code>ANIMATION_KEYS</code> のキーを指定して再生するだけです。
+  </dd>
+</dl>
+
+<div class="note">
+<strong>全体の流れ:</strong>
+ScrollScene.create() で Player が1つ生成され(① constructor)、
+ゲームループが始まると毎フレーム ScrollScene.update() → Player.update()(②)が呼ばれて
+プレイヤーが操作されます。爆弾に当たった瞬間だけ ③ tintDamage() が割り込み、見た目が変化します。
+④ createAnimations() はその裏側で、①の最初に1回だけ実行される準備処理です。
+</div>
+</section>
+
+<section>
+<h2 class="ts">TypeScriptの言語仕様</h2>
+
+<dl>
+  <dt>readonly プロパティ</dt>
+  <dd>
+    <pre><code>readonly sprite: ArcadeSprite;</code></pre>
+    一度代入したら書き換えられないことを示します。
+    <code>sprite</code> はコンストラクタで1回だけ作られ、後から別のオブジェクトに差し替えることはない、という意図を表しています。
+  </dd>
+
+  <dt>コンストラクタ引数の private readonly</dt>
+  <dd>
+    <pre><code>constructor(private readonly scene: Phaser.Scene, x: number, y: number) {</code></pre>
+    引数に <code>private readonly</code> を付けると、
+    「<code>this.scene = scene</code> という代入」と「<code>private readonly scene</code> プロパティの宣言」を同時に行ったことになります(パラメータプロパティ)。
+    クラス内のどこからでも <code>this.scene</code> として使えます。
+  </dd>
+
+  <dt>import type</dt>
+  <dd>
+    <pre><code>import type { ArcadeSprite } from "../types/arcade.js";</code></pre>
+    型情報だけをインポートする書き方です。
+    ビルド後のJavaScriptには影響しない(型チェックのためだけに存在する)ことが明示されます。
+  </dd>
+
+  <dt>private メソッド</dt>
+  <dd>
+    <pre><code>private createAnimations(): void { ... }</code></pre>
+    クラスの外からは呼べないメソッドです。
+    アニメーション登録は <code>Player</code> 内部だけで完結する処理なので <code>private</code> にしています。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2 class="phaser">Phaser 4の仕様</h2>
+
+<dl>
+  <dt>physics.add.sprite</dt>
+  <dd>
+    <pre><code>scene.physics.add.sprite(x, y, ASSET_KEYS.dude);</code></pre>
+    通常の <code>add.sprite</code> と違い、Arcade Physics(物理エンジン)用のbodyが付いたSpriteを作ります。
+    これにより <code>setVelocity</code> や <code>setBounce</code> など、物理に関するメソッドが使えるようになります。
+  </dd>
+
+  <dt>setBounce / setCollideWorldBounds</dt>
+  <dd>
+    <pre><code>this.sprite.setBounce(PLAYER.bounce);
+this.sprite.setCollideWorldBounds(true);</code></pre>
+    <code>setBounce</code> は地面に着地したときの跳ね返り具合、
+    <code>setCollideWorldBounds(true)</code> は画面の端で止まる(外に出ない)ようにする設定です。
+  </dd>
+
+  <dt>cursorKeys と update</dt>
+  <dd>
+    <pre><code>update(cursorKeys: Phaser.Types.Input.Keyboard.CursorKeys): void</code></pre>
+    <code>update()</code> はSceneから毎フレーム呼ばれることを想定したメソッドです。
+    <code>cursorKeys</code> はキーボードの上下左右キーの押下状態を持つオブジェクトで、
+    <code>cursorKeys.left.isDown</code> のように現在押されているかを確認できます。
+  </dd>
+
+  <dt>body.touching.down</dt>
+  <dd>
+    <pre><code>if (cursorKeys.up.isDown &amp;&amp; this.sprite.body.touching.down) {
+  this.sprite.setVelocityY(PLAYER.jumpVelocity);
+}</code></pre>
+    <code>body.touching.down</code> は「Spriteの下側が何かに接触しているか」を表します。
+    これを確認せずにジャンプ処理を書くと、空中にいてもジャンプキーを押すたびに上昇してしまい、
+    無限に空を飛べてしまいます。
+  </dd>
+
+  <dt>anims.create と generateFrameNumbers</dt>
+  <dd>
+    <pre><code>this.scene.anims.create({
+  key: ANIMATION_KEYS.left,
+  frames: this.scene.anims.generateFrameNumbers(ASSET_KEYS.dude, { start: 0, end: 3 }),
+  frameRate: 10,
+  repeat: -1,
+});</code></pre>
+    1枚のスプライトシート画像(<code>dude</code>)の中から、指定した範囲のフレーム(0〜3番)を切り出して、
+    1つのアニメーションとして登録します。<code>repeat: -1</code> はループ再生を意味します。
+  </dd>
+
+  <dt>anims.exists による二重登録防止</dt>
+  <dd>
+    <pre><code>if (!this.scene.anims.exists(ANIMATION_KEYS.left)) {
+  this.scene.anims.create({ ... });
+}</code></pre>
+    アニメーションはScene全体で共有されるリソースです。
+    Sceneが再起動された場合などに同じキーで <code>anims.create</code> を呼ぶとエラーになるため、
+    既に登録済みかどうかを <code>anims.exists</code> で確認しています。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>設計のポイント: 継承ではなく「委譲」</h2>
+<p>
+<code>Player</code> クラスは <code>Phaser.Scene</code> や <code>Phaser.GameObjects.Sprite</code> を
+<strong>継承していません</strong>。ただのTypeScriptクラスです。
+</p>
+<p>
+Phaserの <code>Scene</code> クラスには、もともと <code>update()</code> というメソッドがあり、
+<code>ScrollScene extends Phaser.Scene</code> でこれを<strong>オーバーライド(上書き)</strong>しています。
+これはPhaserのライフサイクルの一部で、エンジンが毎フレーム自動的に呼び出します。
+</p>
+<p>
+一方、<code>Player.update()</code> はPhaserとは無関係な、<strong>普通のメソッド</strong>です。
+たまたま同じ名前を付けているだけで、Phaserから直接呼ばれることはありません。
+<code>ScrollScene.update()</code>(Phaserが呼ぶ側)の中で、
+</p>
+<pre><code>this._player.update(this._cursorKeys);</code></pre>
+<p>
+のように、ScrollSceneが<strong>自分の意思で</strong> <code>Player</code> の処理を呼び出しています。
+このように「自分で処理せず、別のオブジェクトに処理を任せる」やり方を<strong>委譲(delegation)</strong>と呼びます。
+</p>
+<div class="note">
+継承だと「Player is a Scene(PlayerはSceneの一種)」という関係になってしまいますが、
+実際にはそうではありません。委譲を使うことで、
+「ScrollSceneはPlayerを持っている(has-a)」という自然な関係のまま、
+Sceneの責務を肥大化させずにキャラクターの処理を分離できます。
+</div>
+</section>
+
+</body>
+</html>

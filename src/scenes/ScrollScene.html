@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>解説: ScrollScene.ts</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+
+<nav class="breadcrumb"><a href="../index.html">← 解説一覧へ戻る</a></nav>
+
+<h1>ScrollScene.ts の解説</h1>
+
+<section>
+<h2>このファイルの役割</h2>
+<p>
+このゲームの「舞台」となるSceneクラスです。
+素材の読み込み(preload)、画面の初期構築(create)、毎フレームの更新(update)というPhaserの
+ライフサイクルに沿って、<code>Player</code> / <code>Platforms</code> / <code>Stars</code> /
+<code>Bombs</code> / <code>ScoreBoard</code> を組み立て、それぞれの間の衝突・接触判定を設定します。
+</p>
+<p>
+ScrollScene自身はキャラクターの動きやアニメーションの詳細を持たず、
+「誰と誰がぶつかったら何が起きるか」という<strong>全体の調整役</strong>に専念しています。
+</p>
+</section>
+
+<section>
+<h2>前提となる用語</h2>
+<dl>
+  <dt>Scene(シーン)</dt>
+  <dd>
+    Phaserにおける「1つの画面・1つのゲーム場面」を表す単位です。
+    タイトル画面・ステージ1・ゲームオーバー画面などを、それぞれ別のSceneとして作ることもできます。
+    このプロジェクトでは <code>ScrollScene</code> という1つのSceneだけでゲーム全体を構成しています。
+  </dd>
+
+  <dt>collider と overlap</dt>
+  <dd>
+    どちらも2つのオブジェクト(またはGroup)の間で「重なり」を検出する仕組みですが、役割が異なります。
+    <ul>
+      <li><code>collider</code>: 物理的にぶつかり合い、めり込まないように押し返す(地面とプレイヤーなど)</li>
+      <li><code>overlap</code>: 押し返しは行わず、「重なったこと」だけを検出してコールバックを呼ぶ(プレイヤーとスターなど)</li>
+    </ul>
+  </dd>
+
+  <dt>コールバック関数</dt>
+  <dd>
+    <code>handleCollectStar</code> や <code>handleHitBomb</code> のように、
+    「衝突・接触が起きたときに呼ばれる関数」のことです。
+    <a href="../types/arcade.html">arcade.html</a> で解説した <code>ArcadeCallback</code> 型が使われています。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>各メソッドの説明と処理の流れ</h2>
+
+<p>
+ScrollSceneは <code>Phaser.Scene</code> を継承しており、
+Phaserのエンジンが決まったタイミングで <code>preload</code> → <code>create</code> →
+(<code>update</code> を毎フレーム繰り返す)の順にメソッドを呼び出します。
+(詳しくは最後の「設計のポイント」で説明します。)
+</p>
+
+<dl>
+  <dt>① constructor — Scene登録時に1回だけ</dt>
+  <dd>
+    <pre><code>constructor() {
+  super({ key: 'scrollScene' });
+}</code></pre>
+    <code>super(...)</code> で親クラス(<code>Phaser.Scene</code>)の初期化を行い、
+    このSceneに <code>'scrollScene'</code> という名前(key)を付けています。
+    フィールドの実際の値の代入はまだ行われません。
+  </dd>
+
+  <dt>② preload — ゲーム開始前に1回だけ</dt>
+  <dd>
+    画像・スプライトシートをすべて読み込みます。
+    <ol>
+      <li><code>load.setBaseURL(ASSET_BASE_URL)</code> で、以降の読み込み先のベースURLを指定する</li>
+      <li><code>load.image(キー, パス)</code> を4回呼び、sky/ground/star/bombの各画像を読み込む</li>
+      <li><code>load.spritesheet(...)</code> で、プレイヤー用のスプライトシート(複数フレームを含む画像)を読み込む</li>
+    </ol>
+    ここで読み込みが完了するまで、<code>create()</code> は呼ばれません。
+  </dd>
+
+  <dt>③ create — ゲーム画面の初期構築(1回だけ)</dt>
+  <dd>
+    <ol>
+      <li><code>add.image(400, 300, ASSET_KEYS.sky)</code> で背景画像を最初に追加する
+        (Phaserは追加した順に後ろ→前へ重ねて描画するため、背景は最初に追加する)</li>
+      <li><code>Platforms</code> → <code>Player</code> → <code>Stars</code> → <code>Bombs</code> →
+        <code>ScoreBoard</code> の順にインスタンスを生成し、各フィールドに保持する</li>
+      <li>キーボード入力(<code>cursorKeys</code>)を初期化する</li>
+      <li><code>physics.add.collider</code> / <code>physics.add.overlap</code> を5回呼び、
+        オブジェクト同士の衝突・接触ルールを設定する</li>
+    </ol>
+    この時点で画面に必要なものはすべて配置され、衝突のルールも決まった状態になります。
+  </dd>
+
+  <dt>④ update — 毎フレーム繰り返される</dt>
+  <dd>
+    <pre><code>update(): void {
+  if (!this._player || !this._cursorKeys) {
+    return;
+  }
+
+  this._player.update(this._cursorKeys);
+}</code></pre>
+    <code>_player</code> や <code>_cursorKeys</code> が未初期化の場合(<code>create</code>実行前など)は
+    何もせずに終了します。準備ができていれば、<code>Player.update()</code> を呼び出すだけです。
+    プレイヤーの移動・ジャンプ・アニメーションの判断は、すべて
+    <a href="../character/Player.html">Player.html</a> で解説している <code>Player</code> クラス側に委ねられています。
+  </dd>
+
+  <dt>⑤ handleCollectStar — プレイヤーとスターが重なったとき</dt>
+  <dd>
+    <code>physics.add.overlap(player.sprite, stars.group, this.handleCollectStar, undefined, this)</code>
+    で登録されたコールバックです。
+    <ol>
+      <li>引数で渡された <code>player</code> / <code>star</code> を <code>ArcadeSprite</code> 型に変換する</li>
+      <li><code>Stars.collect(starSprite)</code> でそのスターを非表示にする</li>
+      <li><code>ScoreBoard.add(SCORE.star)</code> でスコアを加算する</li>
+      <li><code>Stars.hasActiveStars()</code> が <code>false</code>(全部回収済み)なら、
+        <code>Stars.reset()</code> でスターを再配置し、<code>Bombs.spawnFromPlayer(playerSprite)</code> で
+        新しいボムを出現させる</li>
+    </ol>
+  </dd>
+
+  <dt>⑥ handleHitBomb — プレイヤーとボムが衝突したとき</dt>
+  <dd>
+    <code>physics.add.collider(player.sprite, bombs.group, this.handleHitBomb, undefined, this)</code>
+    で登録されたコールバックです。
+    <code>physics.pause()</code> で物理シミュレーション全体を停止し、
+    <code>Player.tintDamage()</code> でプレイヤーの見た目を変更し、
+    画面に「GAME OVER」のテキストを表示します。
+    引数の <code>_player</code> / <code>_bomb</code> はこの処理内では使われていません
+    (先頭の <code>_</code> は「あえて使っていない引数」であることを示す習慣的な命名です)。
+  </dd>
+</dl>
+
+<div class="note">
+<strong>全体の流れ:</strong>
+①constructorでSceneが登録され、ゲーム開始時に②preloadで素材を読み込み、
+③createで画面とルールを構築します。その後はゲームが終わるまで④updateが毎フレーム繰り返され、
+途中で衝突・接触が起きると⑤⑥のコールバックがその都度割り込んで実行されます。
+</div>
+</section>
+
+<section>
+<h2 class="ts">TypeScriptの言語仕様</h2>
+
+<dl>
+  <dt>クラスの継承(extends)と super</dt>
+  <dd>
+    <pre><code>class ScrollScene extends Phaser.Scene {
+  constructor() {
+    super({ key: 'scrollScene' });
+  }
+}</code></pre>
+    <code>extends</code> は「あるクラスの機能を引き継いで、新しいクラスを作る」ためのキーワードです。
+    <code>super(...)</code> は、引き継ぎ元のクラス(<code>Phaser.Scene</code>)のコンストラクタを呼び出します。
+    継承についての詳しい解説は、このページ最後の「設計のポイント」も参照してください。
+  </dd>
+
+  <dt>! (非nullアサーション/確定代入アサーション)</dt>
+  <dd>
+    <pre><code>private _player!: Player;</code></pre>
+    通常、クラスのプロパティはコンストラクタの中で値を代入しないとエラーになります。
+    しかし <code>_player</code> はコンストラクタではなく <code>create()</code> の中で代入される設計です。
+    型の末尾に <code>!</code> を付けることで、「このプロパティは(コンストラクタ以外で)必ず代入されるので、
+    未代入チェックを省略してよい」とTypeScriptに伝えています。
+  </dd>
+
+  <dt>アロー関数のクラスプロパティ</dt>
+  <dd>
+    <pre><code>private handleCollectStar: ArcadeCallback = (player, star) =&gt; {
+  ...
+  this._stars.collect(starSprite);
+  ...
+};</code></pre>
+    <code>handleCollectStar</code> は「メソッド」ではなく、アロー関数を値として持つ
+    <strong>プロパティ</strong>として定義されています。
+    通常のメソッド(<code>handleCollectStar(player, star) { ... }</code>)を
+    コールバックとして渡すと、呼ばれたときに <code>this</code> が <code>ScrollScene</code> を指さなくなることがあります。
+    アロー関数は定義された時点の <code>this</code>(=このScrollSceneインスタンス)を保持するため、
+    コールバックとして渡しても <code>this._stars</code> などが安全に使えます。
+  </dd>
+
+  <dt>複数行のimport</dt>
+  <dd>
+    <pre><code>import {
+  ASSET_BASE_URL,
+  ASSET_KEYS,
+  ASSET_PATHS,
+  PLAYER,
+  SCORE,
+  TEXT,
+} from "../constants/game.js";</code></pre>
+    importする名前が多い場合、1行にまとめず複数行に分けて書くことができます。
+    動作は1行で書いた場合と同じですが、差分(diff)が見やすくなるなどのメリットがあります。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2 class="phaser">Phaser 4の仕様</h2>
+
+<dl>
+  <dt>preload / create / update というライフサイクル</dt>
+  <dd>
+    <code>Phaser.Scene</code> を継承したクラスでは、<code>preload</code> / <code>create</code> /
+    <code>update</code> という名前のメソッドを定義すると、Phaserのエンジンが自動的に
+    決まった順序・タイミングで呼び出してくれます(詳細は「設計のポイント」で解説します)。
+  </dd>
+
+  <dt>load.setBaseURL / load.image / load.spritesheet</dt>
+  <dd>
+    <pre><code>this.load.setBaseURL(ASSET_BASE_URL);
+this.load.image(ASSET_KEYS.sky, ASSET_PATHS.sky);
+this.load.spritesheet(ASSET_KEYS.dude, ASSET_PATHS.dude, { frameWidth: 32, frameHeight: 48 });</code></pre>
+    <code>setBaseURL</code> で指定したURLが、以降の <code>load.image</code> などのパスの先頭に付加されます。
+    <code>load.image</code> は1枚絵、<code>load.spritesheet</code> は
+    「同じサイズのフレームが並んだ1枚の画像」を読み込みます。
+    第3引数の <code>{ frameWidth, frameHeight }</code> で1フレームのサイズを指定します。
+  </dd>
+
+  <dt>add.image と描画順序</dt>
+  <dd>
+    <pre><code>this.add.image(400, 300, ASSET_KEYS.sky);</code></pre>
+    画面に画像を追加します。Phaserは <code>add</code> した順番に、奥から手前へ重ねて描画します。
+    そのため、背景にしたい画像(<code>sky</code>)を最初に追加しています。
+  </dd>
+
+  <dt>physics.add.collider / physics.add.overlap の引数</dt>
+  <dd>
+    <pre><code>this.physics.add.overlap(this._player.sprite, this._stars.group, this.handleCollectStar, undefined, this);</code></pre>
+    引数は順に「対象1」「対象2」「コールバック関数」「processCallback(追加の条件判定、未使用なら<code>undefined</code>)」
+    「コールバック内での<code>this</code>として使うオブジェクト」です。
+    最後に <code>this</code>(ScrollSceneインスタンス)を渡すことで、コールバック内で
+    <code>this._stars</code> のようにScrollSceneのプロパティへアクセスできるようになります。
+  </dd>
+
+  <dt>physics.pause()</dt>
+  <dd>
+    <pre><code>this.physics.pause();</code></pre>
+    Arcade Physicsのシミュレーション全体を停止します。
+    これにより、ゲームオーバー後はプレイヤーもボムも動かなくなります
+    (Scene自体やTextの表示処理は停止しないため、その後の <code>this.add.text(...)</code> は問題なく実行されます)。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>設計のポイント: 継承(Scene) と 委譲(各クラス)の組み合わせ</h2>
+<p>
+<code>ScrollScene</code> は <code>class ScrollScene extends Phaser.Scene</code> という形で、
+Phaserの <code>Scene</code> クラスを<strong>継承</strong>しています。
+これは「ScrollScene is a Scene(ScrollSceneはSceneの一種である)」という関係です。
+</p>
+<p>
+継承しているからこそ、<code>preload</code> / <code>create</code> / <code>update</code> という
+特別な名前のメソッドを定義するだけで、Phaserのエンジンが自動的にそれらを呼び出してくれます。
+これは <code>Phaser.Scene</code> 側にあらかじめ用意されている仕組み(ライフサイクル)に、
+自分のクラスを「乗せる」イメージです。
+</p>
+<div class="note">
+これに対して <code>Player</code> / <code>Platforms</code> / <code>Stars</code> / <code>Bombs</code> /
+<code>ScoreBoard</code> は、いずれも <code>Phaser.Scene</code> や <code>Sprite</code> を継承していない、
+ただのTypeScriptクラスです。ScrollSceneはこれらのインスタンスを<code>create()</code>で生成して保持し、
+<code>update()</code> から <code>this._player.update(...)</code> のように
+<strong>自分の意思で呼び出す</strong>ことで処理を任せています。
+これは継承とは異なる「委譲(delegation)」というやり方で、
+<a href="../character/Player.html">Player.html</a> の「設計のポイント」でも解説しています。
+</div>
+<p>
+まとめると、このプロジェクトの設計は次のようになっています。
+</p>
+<ul>
+  <li><strong>継承</strong>: ScrollSceneだけがPhaser.Sceneを継承し、Phaserのライフサイクルに乗る</li>
+  <li><strong>委譲</strong>: ScrollSceneは、キャラクターや背景・UIなどの個別の処理を、各クラスのインスタンスに委譲する</li>
+</ul>
+<p>
+こうすることで、Phaserに関する手続き(継承・ライフサイクル)はScrollSceneに集約されつつ、
+ゲームの各要素(プレイヤー、足場、スコアなど)は独立したクラスとして読み書きしやすい状態を保っています。
+他のプロジェクトでも、新しい要素を追加するときはこの「委譲」の形を踏襲すると、
+ScrollScene(やそれに相当するSceneクラス)が肥大化しにくくなります。
+</p>
+</section>
+
+</body>
+</html>

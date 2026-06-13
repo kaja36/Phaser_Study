@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>解説一覧: Phaser 4 学習用プロジェクト</title>
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+
+<h1>各ファイルの解説一覧</h1>
+
+<p>
+このプロジェクトは、初学者向けにPhaser 4の使い方を学ぶためのサンプルです。
+各<code>.ts</code>ファイルには最小限のコメントのみを残し、
+詳しい説明は同じディレクトリにある対応する<code>.html</code>ファイルにまとめています。
+</p>
+
+<div class="note">
+<strong>読み進める順番について:</strong>
+コードは<code>main.ts</code> → <code>ScrollScene.ts</code> → 各クラス、という順に実行されますが、
+解説は<strong>下記の順番</strong>で読むと、TypeScriptの基本的な書き方(型・クラスなど)から
+Phaser 4特有の仕組みへと無理なくつながるようにしています。
+</div>
+
+<section>
+<h2>1. 土台となる型・定数</h2>
+<dl>
+  <dt><a href="types/arcade.html">types/arcade.html</a></dt>
+  <dd>プロジェクト全体で使う型(<code>ArcadeSprite</code> / <code>ArcadeCallback</code>)の定義。型エイリアスや<code>import type</code>の基本がわかります。</dd>
+
+  <dt><a href="constants/game.html">constants/game.html</a></dt>
+  <dd>ゲーム全体で使う数値・文字列の定数定義。<code>as const</code>の使い方と、定数を1ファイルに集約する理由がわかります。</dd>
+</dl>
+</section>
+
+<section>
+<h2>2. ゲームを構成する各クラス(委譲される側)</h2>
+<dl>
+  <dt><a href="character/Player.html">character/Player.html</a></dt>
+  <dd>
+    プレイヤーキャラクターの見た目と操作を管理するクラス。
+    <strong>「継承ではなく委譲」</strong>という、このプロジェクト全体の設計の考え方が最初に出てくるページです。
+  </dd>
+
+  <dt><a href="stage/Platforms.html">stage/Platforms.html</a></dt>
+  <dd>地面・足場を生成するクラス。Static Groupと<code>refreshBody</code>について説明しています。</dd>
+
+  <dt><a href="objects/Stars.html">objects/Stars.html</a></dt>
+  <dd>収集アイテム「スター」を管理するクラス。Groupの一括生成・回収・再配置の流れがわかります。</dd>
+
+  <dt><a href="objects/Bombs.html">objects/Bombs.html</a></dt>
+  <dd>敵オブジェクト「ボム」を管理するクラス。動的なGroupへのSprite追加と型アサーション(<code>as</code>)について説明しています。</dd>
+
+  <dt><a href="ui/ScoreBoard.html">ui/ScoreBoard.html</a></dt>
+  <dd>スコア表示を管理するクラス。Textオブジェクトの基本的な扱い方がわかります。</dd>
+</dl>
+</section>
+
+<section>
+<h2>3. 全体の調整役(継承する側)</h2>
+<dl>
+  <dt><a href="scenes/ScrollScene.html">scenes/ScrollScene.html</a></dt>
+  <dd>
+    <code>Phaser.Scene</code>を継承するSceneクラス。preload/create/updateのライフサイクル、
+    各クラスへの「委譲」、衝突・接触判定の設定方法を解説しています。
+    <strong>このプロジェクトの設計を理解する上で最も重要なページです。</strong>
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>4. ゲームの起動</h2>
+<dl>
+  <dt><a href="main.html">main.html</a></dt>
+  <dd>ゲーム全体のエントリーポイント。<code>Phaser.Game</code>の設定項目と起動の流れを説明しています。</dd>
+</dl>
+</section>
+
+<section>
+<h2>このプロジェクトの設計のまとめ</h2>
+<p>
+このプロジェクトは、次の2つの考え方を組み合わせて作られています。
+</p>
+<ul>
+  <li><strong>継承</strong>: <code>ScrollScene</code>だけが<code>Phaser.Scene</code>を継承し、Phaserのライフサイクル(preload/create/update)に乗る</li>
+  <li><strong>委譲</strong>: ゲームの各要素(プレイヤー、足場、アイテム、スコアなど)は、Phaserのクラスを継承しないただのTypeScriptクラスとして作り、<code>ScrollScene</code>からインスタンスを生成して処理を任せる</li>
+</ul>
+<p>
+別のプロジェクトで新しい機能(新しいキャラクターやアイテムなど)を追加する場合も、
+この「委譲されるクラスを1つ作り、<code>ScrollScene</code>(に相当するSceneクラス)から呼び出す」
+という形を踏襲すると、Sceneクラスが肥大化しにくく、見通しの良い構成を保てます。
+</p>
+</section>
+
+</body>
+</html>

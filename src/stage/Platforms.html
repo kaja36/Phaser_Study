@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>解説: Platforms.ts</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+
+<nav class="breadcrumb"><a href="../index.html">← 解説一覧へ戻る</a></nav>
+
+<h1>Platforms.ts の解説</h1>
+
+<section>
+<h2>このファイルの役割</h2>
+<p>
+プレイヤーやアイテムが乗る「地面・足場」を生成して管理するクラスです。
+<code>constants/game.ts</code> の <code>PLATFORM_LAYOUT</code> に書かれた座標情報をもとに、
+足場用の画像を必要な数だけ並べます。
+</p>
+</section>
+
+<section>
+<h2>前提となる用語</h2>
+<dl>
+  <dt>Static Group(静的グループ)</dt>
+  <dd>
+    Arcade Physicsにおける「動かない物理オブジェクトの集まり」です。
+    重力の影響を受けず、速度も持ちません。地面や壁など、ゲーム中に位置が変わらないものに使います。
+    (動くオブジェクト用の型については <a href="../types/arcade.html">arcade.html</a> の
+    「Dynamic Body」も参考にしてください。)
+  </dd>
+
+  <dt>refreshBody</dt>
+  <dd>
+    Spriteの見た目を <code>setScale</code> などで拡大・縮小したとき、
+    当たり判定(物理ボディ)のサイズは自動では変わりません。
+    <code>refreshBody()</code> を呼ぶことで、見た目のサイズに合わせて当たり判定を更新できます。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>処理の流れ</h2>
+<p>
+このクラスにはconstructorしかありません。<code>ScrollScene.create()</code> から
+<code>new Platforms(this)</code> として1回だけ呼ばれます。
+</p>
+<ol>
+  <li><code>scene.physics.add.staticGroup()</code> で、空の静的グループを作成し <code>this.group</code> に保持する</li>
+  <li><code>PLATFORM_LAYOUT</code>(座標のリスト)を <code>forEach</code> で1件ずつ処理する</li>
+  <li>各座標に対して <code>group.create(x, y, ASSET_KEYS.ground)</code> で足場の画像を1つ生成する</li>
+  <li>その要素に <code>scale</code> が指定されている場合だけ、<code>setScale</code> で拡大し <code>refreshBody</code> で当たり判定を更新する</li>
+</ol>
+<p>
+<code>PLATFORM_LAYOUT</code> には4つの足場の情報が定義されており、結果として4つの足場が画面上に配置されます。
+</p>
+</section>
+
+<section>
+<h2 class="ts">TypeScriptの言語仕様</h2>
+
+<dl>
+  <dt>forEach によるループ</dt>
+  <dd>
+    <pre><code>PLATFORM_LAYOUT.forEach((platform) =&gt; { ... });</code></pre>
+    配列の各要素に対して、順番に同じ処理を実行します。
+    <code>for</code> 文と違い、ループ用の変数(<code>i</code>など)を自分で管理する必要がありません。
+  </dd>
+
+  <dt>in 演算子によるプロパティの存在チェック</dt>
+  <dd>
+    <pre><code>if ("scale" in platform) {
+  body.setScale(platform.scale).refreshBody();
+}</code></pre>
+    <code>"プロパティ名" in オブジェクト</code> で、そのオブジェクトが指定したプロパティを持っているかを確認できます。
+    <code>PLATFORM_LAYOUT</code> の要素には <code>scale</code> を持つものと持たないものが混在していますが、
+    この <code>if</code> の中では <code>platform.scale</code> が安全に(型エラーなく)参照できます。
+    TypeScriptが「このifの中ではscaleプロパティが存在する」と認識してくれるためです。
+  </dd>
+
+  <dt>メソッドチェーン</dt>
+  <dd>
+    <pre><code>body.setScale(platform.scale).refreshBody();</code></pre>
+    <code>setScale(...)</code> の戻り値が再び自分自身(body)であるため、
+    続けて <code>.refreshBody()</code> を呼び出せます。
+    「<code>body.setScale(...)</code> を実行した結果に対して <code>.refreshBody()</code> を実行する」という意味です。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2 class="phaser">Phaser 4の仕様</h2>
+
+<dl>
+  <dt>physics.add.staticGroup</dt>
+  <dd>
+    <pre><code>this.group = scene.physics.add.staticGroup();</code></pre>
+    動かない物理オブジェクトをまとめるためのグループを作成します。
+    <code>ScrollScene</code> 側では、この <code>group</code> を
+    <code>physics.add.collider(player.sprite, platforms.group)</code> のように衝突判定の対象として渡します。
+  </dd>
+
+  <dt>group.create</dt>
+  <dd>
+    <pre><code>const body = this.group.create(platform.x, platform.y, ASSET_KEYS.ground);</code></pre>
+    指定した座標・画像キーで、グループに新しい子オブジェクト(Sprite)を1つ追加して返します。
+  </dd>
+
+  <dt>setScale と refreshBody の組み合わせ</dt>
+  <dd>
+    <pre><code>body.setScale(platform.scale).refreshBody();</code></pre>
+    <code>PLATFORM_LAYOUT</code> の最初の足場(地面)は <code>scale: 2</code> が指定されており、
+    画像を2倍に拡大しています。<code>refreshBody()</code> を呼ばないと、
+    見た目は大きくなっても当たり判定は元のサイズのままになり、プレイヤーが「すり抜ける」ような状態になってしまいます。
+  </dd>
+</dl>
+</section>
+
+</body>
+</html>

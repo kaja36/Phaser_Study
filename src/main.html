@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>解説: main.ts</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+
+<nav class="breadcrumb"><a href="../index.html">← 解説一覧へ戻る</a></nav>
+
+<h1>main.ts の解説</h1>
+
+<section>
+<h2>このファイルの役割</h2>
+<p>
+このゲーム全体の<strong>起点(エントリーポイント)</strong>となるファイルです。
+「画面の大きさ」「物理エンジンの設定」「最初に表示するScene」などをまとめた設定オブジェクトを作り、
+それを使って <code>Phaser.Game</code> を1つだけ生成します。これによりゲームが起動します。
+</p>
+</section>
+
+<section>
+<h2>前提となる用語</h2>
+<dl>
+  <dt>GameConfig(ゲーム設定オブジェクト)</dt>
+  <dd>
+    Phaserのゲームを起動するときに必要な設定をまとめたオブジェクトです。
+    画面サイズ、レンダリング方法、物理エンジン、最初に使うSceneなどを指定します。
+  </dd>
+
+  <dt>Phaser.Game インスタンス</dt>
+  <dd>
+    Phaserのゲーム本体を表すオブジェクトです。
+    <code>new Phaser.Game(config)</code> を実行した時点で、設定に基づいてゲームループが開始され、
+    指定されたScene(ここでは <code>ScrollScene</code>)の <code>preload</code> → <code>create</code> →
+    <code>update</code>... という流れが動き出します。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>設定内容の説明と処理の流れ</h2>
+
+<dl>
+  <dt>① type: Phaser.AUTO</dt>
+  <dd>
+    画面の描画方法(レンダラー)を指定します。
+    <code>Phaser.CANVAS</code>(Canvas APIを使用)、<code>Phaser.WEBGL</code>(WebGLを使用)、
+    <code>Phaser.AUTO</code>(WebGLが使えればWebGL、使えなければCanvasを自動選択)から選べます。
+    通常は <code>Phaser.AUTO</code> で問題ありません。
+  </dd>
+
+  <dt>② width / height: GAME_SIZE.width / GAME_SIZE.height</dt>
+  <dd>
+    ゲーム画面の幅と高さ(ピクセル)です。
+    <code>constants/game.ts</code> の <code>GAME_SIZE</code> から値を取得しています。
+    <code>Bombs.ts</code> がボムの出現位置を決める際にも、同じ <code>GAME_SIZE</code> を参照しています。
+  </dd>
+
+  <dt>③ physics: { default: 'arcade', arcade: { gravity, debug } }</dt>
+  <dd>
+    使用する物理エンジンを指定します。<code>default: 'arcade'</code> は
+    「Arcade Physicsを使う」という指定です。
+    <code>arcade.gravity</code> と <code>arcade.debug</code> には、
+    <code>constants/game.ts</code> の <code>PHYSICS</code> の値を渡しています。
+    <code>debug: true</code> にすると、当たり判定の範囲が画面上に線で表示されるようになります
+    (動作確認時に便利です)。
+  </dd>
+
+  <dt>④ input: { keyboard: true }</dt>
+  <dd>
+    キーボード入力を有効にします。これにより <code>ScrollScene.create()</code> 内で
+    <code>this.input.keyboard.createCursorKeys()</code> が使えるようになります。
+  </dd>
+
+  <dt>⑤ scene: ScrollScene</dt>
+  <dd>
+    最初に起動するSceneとして、<code>ScrollScene</code> クラスそのものを指定します。
+    インスタンス(<code>new ScrollScene()</code>)ではなく、クラス自体を渡している点に注意してください
+    (詳しくはTypeScriptの言語仕様セクションで解説します)。
+  </dd>
+
+  <dt>⑥ new Phaser.Game(config)</dt>
+  <dd>
+    ここまでの設定を渡して <code>Phaser.Game</code> のインスタンスを作成します。
+    この1行が実行された瞬間に、Phaserのエンジンが起動し、
+    <a href="scenes/ScrollScene.html">ScrollScene.html</a> で解説しているライフサイクル
+    (preload → create → update)が動き始めます。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2 class="ts">TypeScriptの言語仕様</h2>
+
+<dl>
+  <dt>型注釈付きのオブジェクトリテラル</dt>
+  <dd>
+    <pre><code>const config: Phaser.Types.Core.GameConfig = {
+  type: Phaser.AUTO,
+  width: GAME_SIZE.width,
+  ...
+};</code></pre>
+    <code>: Phaser.Types.Core.GameConfig</code> という型注釈を付けることで、
+    <code>config</code> オブジェクトが持つべきプロパティ名・型が決まります。
+    存在しないプロパティを書いたり、型の合わない値を入れたりすると、その場でエラーとして検出できます。
+  </dd>
+
+  <dt>オブジェクトのネスト(入れ子)</dt>
+  <dd>
+    <pre><code>physics: {
+  default: 'arcade',
+  arcade: {
+    gravity: PHYSICS.gravity,
+    debug: PHYSICS.debug
+  }
+}</code></pre>
+    オブジェクトの値として、さらにオブジェクトを書くことができます。
+    <code>config.physics.arcade.gravity</code> のように、設定が階層構造で表現されています。
+  </dd>
+
+  <dt>クラスそのものを値として渡す</dt>
+  <dd>
+    <pre><code>scene: ScrollScene,</code></pre>
+    <code>new ScrollScene()</code> ではなく、<code>ScrollScene</code> という
+    <strong>クラス自体</strong>を値として渡しています。
+    TypeScript/JavaScriptではクラスも「値」の一種であり、変数に入れたり関数に渡したりできます。
+    Phaser側がこのクラスを受け取り、必要なタイミングで内部的に <code>new</code> してインスタンス化します。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2 class="phaser">Phaser 4の仕様</h2>
+
+<dl>
+  <dt>Phaser.AUTO / Phaser.CANVAS / Phaser.WEBGL</dt>
+  <dd>
+    Phaserが提供する定数で、レンダリング方式を表します。
+    <code>type</code> プロパティにこれらの定数を指定することで、描画の仕組みを切り替えられます。
+  </dd>
+
+  <dt>arcade.gravity の形式</dt>
+  <dd>
+    <code>constants/game.ts</code> の解説でも触れていますが、
+    <code>gravity</code> は <code>{ x, y }</code> という形のオブジェクトで指定します。
+    ここで設定した重力は、ゲーム内の<strong>すべての</strong>Arcade Physicsオブジェクト
+    (プレイヤー、スター、ボムなど)に共通で適用されます。
+  </dd>
+
+  <dt>scene にクラスを渡す仕組み</dt>
+  <dd>
+    <code>scene</code> プロパティには、Sceneのクラスを1つ、または配列で複数渡すことができます。
+    複数渡した場合は、配列の最初のSceneが最初に起動します。
+    このプロジェクトでは <code>ScrollScene</code> 1つだけを指定しているため、
+    ゲーム開始時に <code>ScrollScene</code> が起動します。
+  </dd>
+</dl>
+</section>
+
+</body>
+</html>

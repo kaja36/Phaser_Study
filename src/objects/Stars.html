@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>解説: Stars.ts</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+
+<nav class="breadcrumb"><a href="../index.html">← 解説一覧へ戻る</a></nav>
+
+<h1>Stars.ts の解説</h1>
+
+<section>
+<h2>このファイルの役割</h2>
+<p>
+プレイヤーが集める「スター」を管理するクラスです。
+複数のスターを並べて配置し、回収・全回収判定・再配置(復活)までをまとめて担当します。
+</p>
+</section>
+
+<section>
+<h2>前提となる用語</h2>
+<dl>
+  <dt>Group作成時の key / repeat / setXY</dt>
+  <dd>
+    <code>physics.add.group({ key, repeat, setXY })</code> のように設定オブジェクトを渡すと、
+    最初から複数のSpriteが並んだ状態のGroupを一度に作成できます。
+    <code>key</code> は使用する画像、<code>repeat</code> は最初の1個に加えて追加で生成する数、
+    <code>setXY</code> は配置開始位置と、1個ごとの間隔(<code>stepX</code>)です。
+    (<code>Bombs.ts</code> では引数なしの <code>physics.add.group()</code> で空のGroupを作っていましたが、
+    こちらは「最初から並んだ状態」を作る点が異なります。)
+  </dd>
+
+  <dt>getChildren()</dt>
+  <dd>
+    Group内に含まれる、すべての子オブジェクト(Sprite)を配列で取得します。
+    全要素に同じ処理をしたいときに <code>getChildren().forEach(...)</code> という形でよく使われます。
+  </dd>
+
+  <dt>active な状態</dt>
+  <dd>
+    PhaserのGameObjectが持つフラグで、「現在ゲーム内で有効かどうか」を表します。
+    <code>disableBody</code> で無効化されたスターは <code>active = false</code> になり、
+    <code>countActive(true)</code> でのカウント対象から外れます。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>各メソッドの説明と処理の流れ</h2>
+
+<dl>
+  <dt>① constructor(scene) — 生成時に1回だけ</dt>
+  <dd>
+    <code>ScrollScene.create()</code> から <code>new Stars(this)</code> として呼ばれます。
+    <ol>
+      <li><code>STAR_FIELD</code> の設定に従い、複数のスターが並んだ状態のGroupを作成する</li>
+      <li><code>getChildren().forEach</code> で各スターを1つずつ取り出し、
+        <code>setBounceY</code> でランダムな縦方向の跳ね返りを個別に設定する</li>
+    </ol>
+    この時点で、画面上には複数のスターが等間隔に並んだ状態になります。
+  </dd>
+
+  <dt>② collect(star) — プレイヤーがスターに触れたときに1個ずつ</dt>
+  <dd>
+    <code>ScrollScene</code> の <code>handleCollectStar</code> から、触れたスター1個を引数として呼ばれます。
+    <code>disableBody(true, true)</code> により、そのスターの当たり判定を無効化し、画面からも非表示にします。
+    Group自体から削除するわけではなく、「非表示・無効状態」になる点に注意してください。
+  </dd>
+
+  <dt>③ hasActiveStars() — 全回収判定</dt>
+  <dd>
+    <code>collect</code> が呼ばれるたびに <code>ScrollScene</code> から呼ばれ、
+    まだ表示中(active)のスターが1つでも残っているかを <code>boolean</code> で返します。
+    <code>false</code> が返ったとき、<code>ScrollScene</code> は「全部回収された」と判断します。
+  </dd>
+
+  <dt>④ reset() — 全回収後の再配置</dt>
+  <dd>
+    <code>hasActiveStars()</code> が <code>false</code> を返したときに、<code>ScrollScene</code> から呼ばれます。
+    すべてのスターに対して <code>enableBody(true, star.x, STAR_FIELD.startY, true, true)</code> を呼び、
+    「x座標は今の位置のまま、y座標だけ画面上端(<code>STAR_FIELD.startY</code>)に戻して再表示」します。
+    これにより、スターが画面上から再び降ってくるように見えます。
+  </dd>
+</dl>
+
+<div class="note">
+<strong>全体の流れ:</strong>
+①でスターが並べて配置され、プレイヤーが触れるたびに②collectで1つずつ消えていきます。
+③hasActiveStarsで全て消えたことが分かると、④resetで一斉に再配置され、再び降ってくる動きが繰り返されます。
+</div>
+</section>
+
+<section>
+<h2 class="ts">TypeScriptの言語仕様</h2>
+
+<dl>
+  <dt>as による型アサーション(再掲)</dt>
+  <dd>
+    <pre><code>this.group.getChildren().forEach((child) =&gt; {
+  const star = child as ArcadeSprite;
+  ...
+});</code></pre>
+    <code>getChildren()</code> が返す要素の型は汎用的な <code>GameObject</code> です。
+    <code>Bombs.ts</code> と同様に、<code>as ArcadeSprite</code> で
+    「物理ボディ付きSpriteとして扱ってよい」ことをTypeScriptに伝えています。
+  </dd>
+
+  <dt>boolean を返すメソッド</dt>
+  <dd>
+    <pre><code>hasActiveStars(): boolean {
+  return this.group.countActive(true) &gt; 0;
+}</code></pre>
+    <code>countActive(true)</code> は数値(<code>number</code>)を返しますが、
+    <code>&gt; 0</code> という比較式の結果は <code>true</code> / <code>false</code> の
+    <code>boolean</code> になります。戻り値の型注釈 <code>: boolean</code> と一致している必要があります。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2 class="phaser">Phaser 4の仕様</h2>
+
+<dl>
+  <dt>getChildren().forEach(Phaser 4での書き方)</dt>
+  <dd>
+    <pre><code>this.group.getChildren().forEach((child) =&gt; { ... });</code></pre>
+    古いバージョンのPhaserでは <code>group.children.iterate(child =&gt; { ... })</code> という書き方が
+    紹介されることがありますが、Phaser 4では <code>getChildren()</code> で配列を取得し、
+    通常の配列メソッド(<code>forEach</code> など)を使う書き方が基本になります。
+  </dd>
+
+  <dt>setBounceY / Phaser.Math.FloatBetween</dt>
+  <dd>
+    <pre><code>star.setBounceY(Phaser.Math.FloatBetween(STAR_FIELD.minBounceY, STAR_FIELD.maxBounceY));</code></pre>
+    <code>setBounceY</code> は縦方向だけの跳ね返り具合を設定します。
+    <code>Phaser.Math.FloatBetween(min, max)</code> は、<code>Phaser.Math.Between</code>(整数)と違い、
+    指定範囲内のランダムな小数を返します。スターごとに跳ね方が微妙に異なるのはこのためです。
+  </dd>
+
+  <dt>disableBody(true, true) と enableBody(...)</dt>
+  <dd>
+    <pre><code>star.disableBody(true, true);
+star.enableBody(true, star.x, STAR_FIELD.startY, true, true);</code></pre>
+    <code>disableBody(disableBody, hideGameObject)</code> の第1引数 <code>true</code> は物理判定を無効化、
+    第2引数 <code>true</code> は表示も非表示にすることを意味します。
+    <code>enableBody(reset, x, y, enableGameObject, showGameObject)</code> は逆に、
+    指定した座標に移動させながら物理判定と表示を有効化(再表示)します。
+  </dd>
+
+  <dt>countActive(true)</dt>
+  <dd>
+    <code>countActive(true)</code> は、Group内で <code>active = true</code> になっている
+    (=disableBodyされていない)子オブジェクトの数を返します。
+  </dd>
+</dl>
+</section>
+
+</body>
+</html>

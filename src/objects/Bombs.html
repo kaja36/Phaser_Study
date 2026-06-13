@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>解説: Bombs.ts</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+
+<nav class="breadcrumb"><a href="../index.html">← 解説一覧へ戻る</a></nav>
+
+<h1>Bombs.ts の解説</h1>
+
+<section>
+<h2>このファイルの役割</h2>
+<p>
+プレイヤーに当たるとゲームオーバーになる「ボム」を管理するクラスです。
+ボムをまとめるGroupの作成と、新しいボムを出現させる処理を担当します。
+</p>
+</section>
+
+<section>
+<h2>前提となる用語</h2>
+<dl>
+  <dt>Group(グループ)</dt>
+  <dd>
+    複数のSpriteをまとめて管理するためのPhaserの仕組みです。
+    Group全体に対して衝突判定を設定したり、新しいSpriteを追加したりできます。
+    <code>Player.ts</code> では1体だけのSpriteを扱いますが、ボムは「複数出現する可能性がある」ため、
+    最初から空のGroupとして用意しておきます。
+  </dd>
+
+  <dt>Phaser.Math.Between</dt>
+  <dd>
+    指定した範囲内のランダムな整数を返すPhaserのユーティリティ関数です。
+    <code>Phaser.Math.Between(0, 100)</code> なら 0〜100 のいずれかの整数が返ります。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>各メソッドの説明と処理の流れ</h2>
+
+<dl>
+  <dt>① constructor(scene) — 生成時に1回だけ</dt>
+  <dd>
+    <code>ScrollScene.create()</code> から <code>new Bombs(this)</code> として呼ばれます。
+    まだボムは1つも生成せず、空のGroup(<code>this.group</code>)だけを用意します。
+  </dd>
+
+  <dt>② spawnFromPlayer(player) — スターを全て回収したときに呼ばれる</dt>
+  <dd>
+    <code>ScrollScene</code> の <code>handleCollectStar</code> から呼ばれます。
+    <ol>
+      <li>プレイヤーのx座標が画面の左半分・右半分のどちらにいるかを判定する</li>
+      <li>プレイヤーがいない側の範囲から、ランダムなx座標を選ぶ</li>
+      <li>そのx座標と画面上端付近のy座標(<code>BOMB.startY</code>)を使って <code>spawn()</code> を呼ぶ</li>
+    </ol>
+    「プレイヤーの逆側からボムが出てくる」という挙動は、この①②の組み合わせで実現されています。
+  </dd>
+
+  <dt>③ spawn(x, y) — 指定した座標にボムを1つ生成する</dt>
+  <dd>
+    <ol>
+      <li><code>group.create(x, y, ASSET_KEYS.bomb)</code> でボムのSpriteをGroupに追加する</li>
+      <li><code>setBounce</code> で、壁や地面に当たったときの跳ね返り具合を設定する</li>
+      <li><code>setCollideWorldBounds(true)</code> で、画面外に出ないようにする</li>
+      <li><code>setVelocity(x方向はランダム, y方向は固定値)</code> で初速を与える</li>
+    </ol>
+    <code>spawnFromPlayer</code> から呼ばれる以外に、このメソッド自体は座標を指定して
+    単独でも呼び出せる作りになっています。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2 class="ts">TypeScriptの言語仕様</h2>
+
+<dl>
+  <dt>三項演算子(条件 ? 真の場合 : 偽の場合)</dt>
+  <dd>
+    <pre><code>const x = player.x &lt; GAME_SIZE.width / 2
+  ? Phaser.Math.Between(GAME_SIZE.width / 2, GAME_SIZE.width)
+  : Phaser.Math.Between(0, GAME_SIZE.width / 2);</code></pre>
+    <code>条件 ? Aの場合の値 : Bの場合の値</code> という書き方で、
+    if文よりも短く「条件によって値を切り分ける」ことができます。
+    ここでは「プレイヤーが画面左半分にいるか」によって、ボムを出す範囲(右半分 or 左半分)を切り替えています。
+  </dd>
+
+  <dt>as による型アサーション</dt>
+  <dd>
+    <pre><code>const bomb = this.group.create(x, y, ASSET_KEYS.bomb) as ArcadeSprite;</code></pre>
+    <code>group.create(...)</code> の戻り値の型は、Phaserの型定義上は汎用的な
+    <code>Phaser.GameObjects.GameObject</code> になっています。
+    しかし実際には物理ボディ付きのSpriteが返ってくるため、
+    <code>as ArcadeSprite</code> で「この値はArcadeSprite型として扱ってよい」とTypeScriptに伝えています。
+    これにより、続く <code>setBounce</code> や <code>setVelocity</code> などのメソッドを型エラーなく呼び出せます。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2 class="phaser">Phaser 4の仕様</h2>
+
+<dl>
+  <dt>physics.add.group()</dt>
+  <dd>
+    <pre><code>this.group = scene.physics.add.group();</code></pre>
+    引数なしで呼ぶと、空の動的Group(動くオブジェクト用)を作成します。
+    <code>Stars.ts</code> のように初期配置を指定する <code>physics.add.group({ key, repeat, setXY })</code>
+    という書き方もありますが、ボムは後から動的に追加するため、ここでは空のGroupから始めます。
+  </dd>
+
+  <dt>group.create</dt>
+  <dd>
+    <pre><code>const bomb = this.group.create(x, y, ASSET_KEYS.bomb) as ArcadeSprite;</code></pre>
+    指定した座標・画像キーで新しいSpriteを作成し、Groupに追加した上で返します。
+    <code>Platforms.ts</code> でも同名のメソッドが出てきますが、こちらはStatic Groupではなく
+    動的(Dynamic)なGroupに対する呼び出しです。
+  </dd>
+
+  <dt>setBounce / setCollideWorldBounds / setVelocity</dt>
+  <dd>
+    <pre><code>bomb.setBounce(BOMB.bounce);
+bomb.setCollideWorldBounds(true);
+bomb.setVelocity(Phaser.Math.Between(BOMB.minVelocityX, BOMB.maxVelocityX), BOMB.velocityY);</code></pre>
+    <code>Player.ts</code> でも登場した <code>setBounce</code> / <code>setCollideWorldBounds</code> に加えて、
+    <code>setVelocity(x, y)</code> はx・y方向の初速を同時に設定します。
+    ボムはx方向にランダムな速度、y方向には常に同じ下向きの速度が与えられ、画面内を不規則にバウンドします。
+  </dd>
+</dl>
+</section>
+
+</body>
+</html>

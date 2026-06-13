@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>解説: arcade.ts</title>
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+
+<nav class="breadcrumb"><a href="../index.html">← 解説一覧へ戻る</a></nav>
+
+<h1>types/arcade.ts の解説</h1>
+
+<section>
+<h2>このファイルの役割</h2>
+<p>
+このファイルはクラスや関数を持たず、<strong>型(type)の定義だけ</strong>をまとめたファイルです。
+Arcade Physics(Phaserの物理エンジン)を使うときによく出てくる「型の名前」を、
+プロジェクト内で短く・分かりやすく扱えるようにしています。
+</p>
+</section>
+
+<section>
+<h2>前提となる用語</h2>
+<dl>
+  <dt>型(type)・型エイリアス</dt>
+  <dd>
+    TypeScriptでは、値そのものではなく「値の形」を表す<strong>型</strong>を定義できます。
+    <code>export type ArcadeSprite = ...</code> のように、既存の長い型に別名(エイリアス)を付けることを
+    <strong>型エイリアス</strong>と呼びます。
+  </dd>
+
+  <dt>Dynamic Body(動的ボディ)</dt>
+  <dd>
+    Arcade Physicsの中で、<strong>動くことができる</strong>物理ボディです。
+    <code>setVelocity</code> で速度を変えたり、重力の影響を受けたりします。
+    <code>Player</code> や <code>Bombs</code>、<code>Stars</code> のSpriteはこちらに該当します。
+    (対になる「Static Body」は <code>Platforms.ts</code> で使われる、動かない地面用のボディです。)
+  </dd>
+
+  <dt>コールバック関数</dt>
+  <dd>
+    「何かが起きたときに呼び出される関数」のことです。
+    <code>physics.add.overlap</code> や <code>physics.add.collider</code> に渡す関数は、
+    「2つのオブジェクトが重なった/衝突したときに呼ばれるコールバック関数」になります。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>このファイルで定義している型</h2>
+
+<dl>
+  <dt>ArcadeSprite</dt>
+  <dd>
+    <pre><code>export type ArcadeSprite = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;</code></pre>
+    「Dynamic Bodyを持つSprite」を表す型です。
+    <code>Player.sprite</code>、<code>Bombs</code> や <code>Stars</code> が生成するSpriteなど、
+    <code>physics.add.sprite</code> や <code>group.create</code> で作られたSpriteの型として使われます。
+    この型がついていることで、<code>setVelocityX</code> や <code>body.touching.down</code> など
+    物理用のプロパティ・メソッドにTypeScriptの補完・型チェックが効くようになります。
+  </dd>
+
+  <dt>ArcadeCallback</dt>
+  <dd>
+    <pre><code>export type ArcadeCallback = Phaser.Types.Physics.Arcade.ArcadePhysicsCallback;</code></pre>
+    <code>physics.add.collider</code> や <code>physics.add.overlap</code> の第3引数に渡す
+    コールバック関数の型です。<code>ScrollScene.ts</code> の <code>handleCollectStar</code> や
+    <code>handleHitBomb</code> がこの型で定義されています。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2 class="ts">TypeScriptの言語仕様</h2>
+
+<dl>
+  <dt>export type(型エイリアスのエクスポート)</dt>
+  <dd>
+    <pre><code>export type ArcadeSprite = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;</code></pre>
+    <code>type 名前 = 既存の型</code> という形で、既存の型に新しい名前を付けています。
+    <code>export</code> を付けることで、他のファイルから
+    <code>import type { ArcadeSprite } from "..."</code> として利用できます。
+  </dd>
+
+  <dt>import type(型だけのインポート)</dt>
+  <dd>
+    <pre><code>import type Phaser from "phaser";</code></pre>
+    「実行時の値としては使わず、型情報としてだけ使う」ことを示すインポートです。
+    このファイルは型の定義しか行わないため、<code>Phaser</code> 本体(クラスや関数)は不要で、
+    型情報だけが必要であることが明示されています。
+  </dd>
+
+  <dt>長い型パスへの別名付け</dt>
+  <dd>
+    <code>Phaser.Types.Physics.Arcade.SpriteWithDynamicBody</code> のような長い型を、
+    使うたびに書くのは大変です。<code>ArcadeSprite</code> という短い名前を1か所で定義しておくことで、
+    他のファイルでは <code>ArcadeSprite</code> と書くだけで済むようになります。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2 class="phaser">Phaser 4の仕様</h2>
+
+<dl>
+  <dt>Phaser.Types 名前空間</dt>
+  <dd>
+    Phaserは <code>Phaser.Types.〜</code> という名前空間の下に、
+    Arcade Physicsや入力(キーボード)などに関する型定義を多数用意しています。
+    このファイルで使っている <code>SpriteWithDynamicBody</code> や
+    <code>ArcadePhysicsCallback</code> もその一部です。
+  </dd>
+
+  <dt>SpriteWithDynamicBody が必要になる理由</dt>
+  <dd>
+    通常の <code>Phaser.GameObjects.Sprite</code> の型には、
+    Arcade Physics用のプロパティ(<code>body</code>、<code>setVelocityX</code> など)が含まれていません。
+    <code>physics.add.sprite</code> で作成したSpriteは、実際にはこれらのプロパティを持っていますが、
+    TypeScriptにそれを伝えるために <code>SpriteWithDynamicBody</code> 型を使う必要があります。
+  </dd>
+</dl>
+</section>
+
+<section>
+<h2>設計のポイント: 型を1か所に集める理由</h2>
+<p>
+<code>Player.ts</code>、<code>Bombs.ts</code>、<code>Stars.ts</code>、<code>ScrollScene.ts</code> など、
+複数のファイルで「物理ボディ付きSprite」や「衝突コールバック」の型が必要になります。
+</p>
+<p>
+もしこの型を各ファイルで毎回 <code>Phaser.Types.Physics.Arcade.SpriteWithDynamicBody</code> と
+書いてしまうと、長くて読みにくく、修正もしにくくなります。
+<code>types/arcade.ts</code> に <code>ArcadeSprite</code> / <code>ArcadeCallback</code> として
+まとめておくことで、各ファイルは
+</p>
+<pre><code>import type { ArcadeSprite } from "../types/arcade.js";</code></pre>
+<p>
+のように短く書けます。プロジェクト全体で同じ型を使っていることも一目で分かるようになります。
+</p>
+</section>
+
+</body>
+</html>
